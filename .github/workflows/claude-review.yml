@@ -44,7 +44,7 @@ jobs:
       # (Optional) Generate a GitHub App token for better commenting behavior
       - name: Generate GitHub App token
         id: app-token
-        if: ${{ secrets.APP_ID && secrets.APP_PRIVATE_KEY }}
+        if: ${{ secrets.APP_ID != '' && secrets.APP_PRIVATE_KEY != '' }}
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.APP_ID }}
@@ -52,7 +52,6 @@ jobs:
 
 
       - name: Run Claude via Anthropic API
-        if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
         uses: anthropics/claude-code-action-official@v1
         with:
           github_token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
