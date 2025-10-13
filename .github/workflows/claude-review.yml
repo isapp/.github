@@ -44,7 +44,7 @@ jobs:
       # (Optional) Generate a GitHub App token for better commenting behavior
       - name: Generate GitHub App token
         id: app-token
-        if: ${{ secrets.APP_ID != '' && secrets.APP_PRIVATE_KEY != '' }}
+        continue-on-error: true
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.APP_ID }}
