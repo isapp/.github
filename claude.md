@@ -2,7 +2,7 @@
 Scope: Python (Django), Kotlin (Android), Swift (iOS), SQL/Redshift.
 
 ## Must-fix
-- Security: OWASP issues, SQL injection, authN/Z, secrets in code, PII mishandling.
+- Security: OWASP issues, SQL injection, authN/Z, FedRamp compliance, HIPAA compliance, PII mishandling.
 - Compliance: HIPAA/SOC2/FedRAMP basics (no PHI in logs; encryption libs; least-priv IAM; KMS usage).
 - Data: migrations safe/rollbackable, schema changes backward compatible.
 - Mobile: UI thread safety; background work; permissions rationale; network timeouts/retries.
