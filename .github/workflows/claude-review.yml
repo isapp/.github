@@ -53,7 +53,7 @@ jobs:
 
       - name: Run Claude via Anthropic API
         if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action-official@v1
         with:
           github_token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
