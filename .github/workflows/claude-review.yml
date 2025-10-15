@@ -48,3 +48,4 @@ jobs:
             Mode: ${{ inputs.mode }}
             Be concise. Flag security/PII/secrets risks. Propose diffs.
           claude_args: "--model ${{ inputs.model }} --max-turns 6"
+          use_sticky_comment: true
