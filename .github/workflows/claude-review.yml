@@ -35,7 +35,26 @@ jobs:
     timeout-minutes: 15
     if: ${{ inputs.paths == '' || contains(join(github.event.pull_request.changed_files, ','), inputs.paths) }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository being reviewed
+        uses: actions/checkout@v4
+
+      - name: Checkout organization .github repo for claude.md
+        uses: actions/checkout@v4
+        with:
+          repository: isapp/.github
+          path: .github-org
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read organization claude.md guidelines
+        id: org_guidelines
+        run: |
+          if [ -f .github-org/claude.md ]; then
+            echo "GUIDELINES<<EOF" >> $GITHUB_OUTPUT
+            cat .github-org/claude.md >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "GUIDELINES=" >> $GITHUB_OUTPUT
+          fi
 
       - name: Run Claude via Anthropic API
         uses: anthropics/claude-code-action@v1
@@ -44,8 +63,13 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
             /review
-            Use CLAUDE.md if present.
-            Mode: ${{ inputs.mode }}
-            Be concise. Flag security/PII/secrets risks. Propose diffs.
+
+            ## Organization Review Guidelines (apply to all repositories):
+            ${{ steps.org_guidelines.outputs.GUIDELINES }}
+
+            ## Additional Instructions:
+            - Also use CLAUDE.md from the repository root if present for repo-specific guidance
+            - Mode: ${{ inputs.mode }}
+            - Be concise. Flag security/PII/secrets risks. Propose diffs.
           claude_args: "--model ${{ inputs.model }} --max-turns 6"
           track_progress: true
