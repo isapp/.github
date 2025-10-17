@@ -27,6 +27,7 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  actions: read     # needed for github_ci MCP server
   id-token: write   # needed for Bedrock/Vertex OIDC
 
 jobs:
