@@ -38,15 +38,18 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Fetch organization guidelines
-        id: org_guidelines
+      - name: Fetch and prepare review prompt
         run: |
           curl -s https://raw.githubusercontent.com/isapp/.github/main/CLAUDE.md > /tmp/org-claude.md
-          {
-            echo "ORG_GUIDELINES<<HEREDOC_DELIMITER_ORG_GUIDELINES_END"
-            cat /tmp/org-claude.md
-            echo "HEREDOC_DELIMITER_ORG_GUIDELINES_END"
-          } >> $GITHUB_OUTPUT
+          cat > /tmp/review-prompt.txt << 'PROMPT_EOF'
+          /review
+
+          ## Organization-Wide Code Review Guidelines
+
+          In addition to repository-specific CLAUDE.md guidelines, also apply these organization-wide standards:
+
+          PROMPT_EOF
+          cat /tmp/org-claude.md >> /tmp/review-prompt.txt
 
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
@@ -55,13 +58,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: |
-            /review
-
-            ## Organization-Wide Code Review Guidelines
-
-            In addition to repository-specific CLAUDE.md guidelines, also apply these organization-wide standards:
-
-            ${{ steps.org_guidelines.outputs.ORG_GUIDELINES }}
-          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }}"
+          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --prompt-file /tmp/review-prompt.txt"
           track_progress: true
