@@ -38,6 +38,14 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
+      - name: Fetch organization guidelines
+        id: org_guidelines
+        run: |
+          curl -s https://raw.githubusercontent.com/isapp/.github/main/CLAUDE.md > /tmp/org-claude.md
+          echo "ORG_GUIDELINES<<EOF" >> $GITHUB_OUTPUT
+          cat /tmp/org-claude.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
         env:
@@ -48,7 +56,10 @@ jobs:
           prompt: |
             /review
 
-            Also apply the organization-wide code review guidelines from:
-            https://raw.githubusercontent.com/isapp/.github/main/CLAUDE.md
+            ## Organization-Wide Code Review Guidelines
+
+            In addition to repository-specific CLAUDE.md guidelines, also apply these organization-wide standards:
+
+            ${{ steps.org_guidelines.outputs.ORG_GUIDELINES }}
           claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }}"
           track_progress: true
