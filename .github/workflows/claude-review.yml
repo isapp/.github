@@ -2,82 +2,47 @@ name: Claude Code – PR Review
 on:
   workflow_call:
     inputs:
-      mode:
-        description: "review | security | fix"
-        required: false
-        type: string
-        default: "review"
-      paths:
-        description: "Only run if these paths change"
-        required: false
-        type: string
-        default: ""
       model:
-        description: "Claude model (direct)"
+        description: "Claude model"
         required: false
         type: string
         default: "claude-sonnet-4-5"
+      max_turns:
+        description: "Maximum conversation turns"
+        required: false
+        type: number
+        default: 6
     secrets:
       ANTHROPIC_API_KEY:
         required: true
-      AWS_ROLE_TO_ASSUME:
-        required: false
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
-  actions: read     # needed for github_ci MCP server
-  id-token: write   # needed for Bedrock/Vertex OIDC
+  actions: read
+  id-token: write
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: ${{ inputs.paths == '' || contains(join(github.event.pull_request.changed_files, ','), inputs.paths) }}
     steps:
-      - name: Checkout repository being reviewed
+      - name: Checkout PR
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full git history for proper diff comparison
+          fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Fetch base branch for comparison
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}
-
-      - name: Checkout organization .github repo for claude.md
-        uses: actions/checkout@v4
-        with:
-          repository: isapp/.github
-          path: .github-org
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Read organization claude.md guidelines
-        id: org_guidelines
-        run: |
-          if [ -f .github-org/claude.md ]; then
-            echo "GUIDELINES<<EOF" >> $GITHUB_OUTPUT
-            cat .github-org/claude.md >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "GUIDELINES=" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run Claude via Anthropic API
+      - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: |
-            /review
-
-            ## Organization Review Guidelines (apply to all repositories):
-            ${{ steps.org_guidelines.outputs.GUIDELINES }}
-
-            ## Additional Instructions:
-            - Also use CLAUDE.md from the repository root if present for repo-specific guidance
-            - Mode: ${{ inputs.mode }}
-            - Be concise. Flag security/PII/secrets risks. Propose diffs.
-          claude_args: "--model ${{ inputs.model }} --max-turns 6"
+          prompt: /review
+          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }}"
           track_progress: true
