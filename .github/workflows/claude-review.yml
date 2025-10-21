@@ -42,9 +42,11 @@ jobs:
         id: org_guidelines
         run: |
           curl -s https://raw.githubusercontent.com/isapp/.github/main/CLAUDE.md > /tmp/org-claude.md
-          echo "ORG_GUIDELINES<<EOF" >> $GITHUB_OUTPUT
-          cat /tmp/org-claude.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "ORG_GUIDELINES<<HEREDOC_DELIMITER_ORG_GUIDELINES_END"
+            cat /tmp/org-claude.md
+            echo "HEREDOC_DELIMITER_ORG_GUIDELINES_END"
+          } >> $GITHUB_OUTPUT
 
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
