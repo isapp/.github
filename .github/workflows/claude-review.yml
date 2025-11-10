@@ -11,7 +11,7 @@ on:
         description: "Maximum conversation turns"
         required: false
         type: number
-        default: 6
+        default: 15
     secrets:
       ANTHROPIC_API_KEY:
         required: true
@@ -45,6 +45,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_bots: "renovate,devin-ai-integration"
           prompt: |
             /review
 
@@ -54,5 +55,5 @@ jobs:
             These org-level guidelines cover security (OWASP, SQL injection, auth), compliance (HIPAA, SOC2, FedRAMP),
             data handling, mobile development, infrastructure, performance, testing, APIs, and dependencies.
             Apply these standards IN ADDITION to any repository-specific CLAUDE.md guidelines.
-          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }}"
+          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --allowedTools 'Read,Glob,Grep,Bash(git log:*),Bash(git diff:*),Bash(git show:*)'"
           track_progress: true
