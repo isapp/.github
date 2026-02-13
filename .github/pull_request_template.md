@@ -1,11 +1,10 @@
 ## Description
 
-<!-- Briefly describe what this PR does and why -->
+<!-- Leave empty to have Claude auto-generate, or write your own -->
 
 ## Ticket
 
-<!-- Replace IM-123 with your ticket number -->
-[IM-123](https://twentyht.atlassian.net/browse/IM-123)
+<!-- Leave empty to auto-detect from branch name, or add manually -->
 
 ## Type of Change
 
@@ -18,7 +17,7 @@
 
 ## Testing Done
 
-<!-- Describe the tests you ran and how to reproduce -->
+<!-- Leave empty to have Claude auto-generate, or write your own -->
 
 ## Checklist
 

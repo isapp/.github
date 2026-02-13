@@ -1,0 +1,311 @@
+name: Auto-fill PR Template
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  auto-fill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract ticket from branch name
+        id: ticket
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          if [[ "$BRANCH" =~ ([Ii][Mm]-[0-9]+) ]]; then
+            TICKET="${BASH_REMATCH[1]^^}"
+            echo "ticket=$TICKET" >> $GITHUB_OUTPUT
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get diff for Claude
+        id: diff
+        run: |
+          # Get the diff (limited to avoid token overflow)
+          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- . ':!package-lock.json' ':!yarn.lock' ':!*.min.js' ':!*.min.css' | head -c 30000)
+
+          # Get file list
+          FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          STATS=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD)
+          FILE_COUNT=$(echo "$FILES" | wc -l)
+
+          # Write to files to avoid escaping issues
+          echo "$DIFF" > /tmp/diff.txt
+          echo "$FILES" > /tmp/files.txt
+          echo "$STATS" > /tmp/stats.txt
+          echo "$FILE_COUNT" > /tmp/file_count.txt
+
+      - name: Detect change type
+        id: type
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          BRANCH_LOWER=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]')
+
+          if [[ "$BRANCH_LOWER" =~ ^fix|bugfix|hotfix ]]; then
+            echo "type=bug" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH_LOWER" =~ ^feat|feature ]]; then
+            echo "type=feature" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH_LOWER" =~ ^refactor ]]; then
+            echo "type=refactor" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH_LOWER" =~ ^docs ]]; then
+            echo "type=docs" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH_LOWER" =~ ^chore|deps|dependencies ]]; then
+            echo "type=chore" >> $GITHUB_OUTPUT
+          else
+            echo "type=unknown" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate description with Claude
+        id: claude
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Skip if no API key
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "No API key found, skipping Claude"
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          DIFF=$(cat /tmp/diff.txt)
+          FILES=$(cat /tmp/files.txt)
+          STATS=$(cat /tmp/stats.txt)
+
+          PROMPT="Analyze this git diff and generate a concise PR description. Focus on WHAT changed and WHY it matters. Be specific but brief (2-4 sentences max).
+
+          Files changed:
+          $FILES
+
+          Stats: $STATS
+
+          Diff:
+          $DIFF
+
+          Respond with ONLY the description text, no headers or formatting."
+
+          RESPONSE=$(curl -s --max-time 30 https://api.anthropic.com/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d "$(jq -n \
+              --arg prompt "$PROMPT" \
+              '{
+                model: "claude-sonnet-4-20250514",
+                max_tokens: 500,
+                messages: [{role: "user", content: $prompt}]
+              }')")
+
+          # Check for errors
+          ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+          if [ -n "$ERROR" ]; then
+            echo "Claude API error: $ERROR"
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          DESCRIPTION=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
+          if [ -z "$DESCRIPTION" ]; then
+            echo "Empty response from Claude"
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "$DESCRIPTION" > /tmp/description.txt
+          echo "success=true" >> $GITHUB_OUTPUT
+
+      - name: Generate testing suggestions with Claude
+        id: testing
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Skip if description generation failed
+          if [ "${{ steps.claude.outputs.success }}" != "true" ]; then
+            echo "Skipping testing suggestions (description failed)"
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          DIFF=$(cat /tmp/diff.txt)
+          FILES=$(cat /tmp/files.txt)
+
+          PROMPT="Based on this diff, suggest 2-3 specific things that should be tested. Be concise - one line per suggestion.
+
+          Files changed:
+          $FILES
+
+          Diff:
+          $DIFF
+
+          Respond with ONLY bullet points, no intro text."
+
+          RESPONSE=$(curl -s --max-time 30 https://api.anthropic.com/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d "$(jq -n \
+              --arg prompt "$PROMPT" \
+              '{
+                model: "claude-sonnet-4-20250514",
+                max_tokens: 300,
+                messages: [{role: "user", content: $prompt}]
+              }')")
+
+          TESTING=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
+          if [ -n "$TESTING" ]; then
+            echo "$TESTING" > /tmp/testing.txt
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and update PR body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            const ticket = '${{ steps.ticket.outputs.ticket }}';
+            const ticketFound = '${{ steps.ticket.outputs.found }}' === 'true';
+            const changeType = '${{ steps.type.outputs.type }}';
+            const claudeSuccess = '${{ steps.claude.outputs.success }}' === 'true';
+            const testingSuccess = '${{ steps.testing.outputs.success }}' === 'true';
+
+            // Get existing PR body
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
+            const existingBody = pr.body || '';
+
+            // Helper to check if a section is empty (only has comment placeholder)
+            const isSectionEmpty = (body, sectionHeader, nextHeader) => {
+              const sectionRegex = new RegExp(`## ${sectionHeader}\\s*([\\s\\S]*?)(?=## ${nextHeader}|$)`, 'i');
+              const match = body.match(sectionRegex);
+              if (!match) return true;
+              const content = match[1].trim();
+              // Empty if only whitespace, empty, or just an HTML comment
+              return !content || /^<!--.*-->$/.test(content);
+            };
+
+            // Helper to check if any checkbox is checked in Type of Change
+            const hasCheckedType = (body) => {
+              const typeSection = body.match(/## Type of Change[\s\S]*?(?=## |$)/i);
+              if (!typeSection) return false;
+              return /\[x\]/i.test(typeSection[0]);
+            };
+
+            // Read file data
+            const files = fs.readFileSync('/tmp/files.txt', 'utf8').trim();
+            const stats = fs.readFileSync('/tmp/stats.txt', 'utf8').trim();
+            const fileCount = parseInt(fs.readFileSync('/tmp/file_count.txt', 'utf8').trim());
+
+            // Determine what to fill
+            const fillDescription = isSectionEmpty(existingBody, 'Description', 'Ticket');
+            const fillTicket = isSectionEmpty(existingBody, 'Ticket', 'Type of Change');
+            const fillType = !hasCheckedType(existingBody) && changeType !== 'unknown';
+            const fillTesting = isSectionEmpty(existingBody, 'Testing Done', 'Checklist');
+
+            // Get description (Claude or fallback)
+            let description;
+            if (fillDescription) {
+              if (claudeSuccess) {
+                description = fs.readFileSync('/tmp/description.txt', 'utf8').trim();
+              } else {
+                const fileList = files.split('\n').slice(0, 10).map(f => `- \`${f}\``).join('\n');
+                const moreFiles = fileCount > 10 ? `\n- ... and ${fileCount - 10} more files` : '';
+                description = `<!-- Claude unavailable -->\n\n**Files changed**\n${fileList}${moreFiles}`;
+              }
+            }
+
+            // Get testing suggestions
+            let testing;
+            if (fillTesting && testingSuccess) {
+              testing = fs.readFileSync('/tmp/testing.txt', 'utf8').trim();
+            }
+
+            // Build ticket section
+            const ticketSection = ticketFound
+              ? `[${ticket}](https://twentyht.atlassian.net/browse/${ticket})`
+              : null;
+
+            // Build type checkboxes
+            const types = {
+              bug: 'Bug fix (non-breaking change that fixes an issue)',
+              feature: 'New feature (non-breaking change that adds functionality)',
+              breaking: 'Breaking change (fix or feature that would cause existing functionality to change)',
+              refactor: 'Refactor (code change that neither fixes a bug nor adds a feature)',
+              docs: 'Documentation update',
+              chore: 'Chore (dependency updates, config changes, etc.)'
+            };
+
+            let typeChecklist = '';
+            for (const [key, label] of Object.entries(types)) {
+              const checked = (fillType && key === changeType) ? 'x' : ' ';
+              typeChecklist += `- [${checked}] ${label}\n`;
+            }
+
+            // Build new body, preserving user content where filled
+            let newBody = existingBody;
+
+            // Replace description if empty
+            if (fillDescription && description) {
+              newBody = newBody.replace(
+                /(## Description\s*)(<!--[\s\S]*?-->)?(\s*)/i,
+                `$1\n${description}\n\n_${stats}_\n\n`
+              );
+            }
+
+            // Replace ticket if empty and found
+            if (fillTicket && ticketSection) {
+              newBody = newBody.replace(
+                /(## Ticket\s*)(<!--[\s\S]*?-->)?(\s*)/i,
+                `$1\n${ticketSection}\n\n`
+              );
+            }
+
+            // Replace type checkboxes if none checked
+            if (fillType) {
+              newBody = newBody.replace(
+                /## Type of Change[\s\S]*?(?=## Testing Done)/i,
+                `## Type of Change\n\n${typeChecklist}\n`
+              );
+            }
+
+            // Replace testing if empty
+            if (fillTesting && testing) {
+              newBody = newBody.replace(
+                /(## Testing Done\s*)(<!--[\s\S]*?-->)?(\s*)/i,
+                `$1\n${testing}\n\n`
+              );
+            }
+
+            // Add footer if we changed anything
+            const madeChanges = fillDescription || (fillTicket && ticketSection) || fillType || (fillTesting && testing);
+            if (madeChanges && !newBody.includes('Auto-generated by Claude') && !newBody.includes('Auto-filled')) {
+              const footer = claudeSuccess ? '\n---\n_✨ Auto-generated by Claude_' : '\n---\n_📝 Auto-filled_';
+              newBody = newBody.trim() + footer;
+            }
+
+            // Only update if body changed
+            if (newBody !== existingBody) {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                body: newBody
+              });
+            }
