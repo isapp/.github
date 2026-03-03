@@ -36,12 +36,18 @@ jobs:
       - name: Get diff for Claude
         id: diff
         run: |
+          # Determine base ref (github.base_ref is empty when triggered via workflow_call)
+          BASE_REF="${{ github.base_ref }}"
+          if [ -z "$BASE_REF" ]; then
+            BASE_REF="main"
+          fi
+
           # Get the diff (limited to avoid token overflow)
-          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- . ':!package-lock.json' ':!yarn.lock' ':!*.min.js' ':!*.min.css' | head -c 30000)
+          DIFF=$(git diff origin/${BASE_REF}...HEAD -- . ':!package-lock.json' ':!yarn.lock' ':!*.min.js' ':!*.min.css' | head -c 30000)
 
           # Get file list
-          FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
-          STATS=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD)
+          FILES=$(git diff --name-only origin/${BASE_REF}...HEAD)
+          STATS=$(git diff --shortstat origin/${BASE_REF}...HEAD)
           FILE_COUNT=$(echo "$FILES" | wc -l)
 
           # Write to files to avoid escaping issues
