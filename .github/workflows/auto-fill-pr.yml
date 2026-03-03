@@ -3,6 +3,10 @@ name: Auto-fill PR Template
 on:
   pull_request:
     types: [opened]
+  workflow_call:
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: false
 
 permissions:
   contents: read
