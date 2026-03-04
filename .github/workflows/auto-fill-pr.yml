@@ -39,12 +39,13 @@ jobs:
           # Determine base ref (github.base_ref is empty when triggered via workflow_call)
           BASE_REF="${{ github.base_ref }}"
           if [ -z "$BASE_REF" ]; then
-            # Detect default branch from remote
-            BASE_REF=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|origin/||' || echo "main")
+            # Fetch default branch from GitHub API
+            BASE_REF=$(curl -s -H "Authorization: Bearer ${{ github.token }}" \
+              "https://api.github.com/repos/${{ github.repository }}" | jq -r '.default_branch // "main"')
           fi
 
           # Ensure the base ref is fetched locally
-          git fetch origin ${BASE_REF}
+          git fetch origin "${BASE_REF}"
 
           # Get the diff (limited to avoid token overflow)
           DIFF=$(git diff origin/${BASE_REF}...HEAD -- . ':!package-lock.json' ':!yarn.lock' ':!*.min.js' ':!*.min.css' | head -c 30000)
