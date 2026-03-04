@@ -168,7 +168,7 @@ jobs:
           Diff:
           $DIFF
 
-          Respond with ONLY bullet points, no intro text."
+          Respond with ONLY unchecked GitHub checkboxes (e.g. '- [ ] item'), no intro text."
 
           RESPONSE=$(curl -s --max-time 30 https://api.anthropic.com/v1/messages \
             -H "Content-Type: application/json" \
