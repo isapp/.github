@@ -12,6 +12,16 @@ on:
         required: false
         type: number
         default: 15
+      timeout_minutes:
+        description: "Job timeout in minutes"
+        required: false
+        type: number
+        default: 15
+      extra_prompt:
+        description: "Additional prompt content appended after the base review prompt"
+        required: false
+        type: string
+        default: ""
     secrets:
       ANTHROPIC_API_KEY:
         required: true
@@ -30,7 +40,7 @@ concurrency:
 jobs:
   review:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
       - name: Checkout PR
         uses: actions/checkout@v5
@@ -43,9 +53,9 @@ jobs:
         env:
           GITHUB_EVENT_NAME: pull_request
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           allowed_bots: "renovate,devin-ai-integration"
+          use_sticky_comment: true
           prompt: |
             /review
 
@@ -53,7 +63,93 @@ jobs:
             https://github.com/isapp/.github/blob/main/CLAUDE.md
 
             These org-level guidelines cover security (OWASP, SQL injection, auth), compliance (HIPAA, SOC2, FedRAMP),
-            data handling, mobile development, infrastructure, performance, testing, APIs, and dependencies.
+            data handling, infrastructure, performance, testing, APIs, and dependencies.
             Apply these standards IN ADDITION to any repository-specific CLAUDE.md guidelines.
+
+            # Review rubric (Claude)
+
+            ## Must-fix
+
+            ### Security
+            - OWASP Top 10 issues: SQL injection, XSS, CSRF, broken authentication, insecure deserialization
+            - AuthN/Z: verify JWT validation, session management, proper OAuth flows, role-based access
+            - API security: rate limiting, input validation, API key rotation, proper CORS configuration
+            - Secrets: no hardcoded credentials, use environment variables or secrets management
+            - PII handling: encrypt PII at rest and in transit, redact PII in logs and error messages
+            - FedRAMP/HIPAA compliance requirements
+
+            ### Compliance (HIPAA/SOC2/FedRAMP)
+            - Logging: no PHI/PII in logs, logs encrypted, proper retention policies
+            - Encryption: use approved algorithms (AES-256, TLS 1.2+), proper key management
+            - Access control: least-privilege, MFA for admin access, proper role separation
+            - Audit trails: log access to sensitive data, retain audit logs per compliance requirements
+            - Data deletion: implement proper data lifecycle, support user data deletion requests
+
+            ### Data & Migrations
+            - Migrations: safe, rollbackable, tested in staging before production
+            - Schema changes: backward compatible, no breaking changes without version bump
+            - Indexes: add indexes for foreign keys and frequently queried columns
+            - Data validation: constraints at database level, not just application level
+            - PHI/PII: ensure proper encryption, audit trails for sensitive data access
+
+            ## Should-fix
+
+            ### Performance
+            - Database: N+1 queries, missing indexes, unbounded result sets
+            - API: missing pagination for list endpoints, slow queries without caching
+            - Memory: large allocations, memory leaks, inefficient data structures
+
+            ### Testing
+            - Unit tests: cover edge cases, error conditions, security validations
+            - Integration tests: test API contracts, database interactions, mock external services
+            - Security tests: authentication failures, authorization boundaries, input validation
+
+            ### APIs/Services
+            - API design: RESTful conventions, proper HTTP status codes, versioning strategy
+            - Error handling: consistent error response format, proper logging without PII
+            - Service-to-service: proper authentication tokens, circuit breakers, timeouts
+            - Pagination: implement for list endpoints to prevent large responses
+            - Documentation: ensure API changes include updated Swagger/OpenAPI docs
+
+            ### Dependencies
+            - Security: flag outdated dependencies with known CVEs
+            - Version pinning: use specific versions in production dependencies
+            - Licensing: ensure licenses are compatible with your usage
+            - Deprecations: flag usage of deprecated APIs or libraries
+
+            ## Nice-to-have (optional suggestions)
+
+            - Code clarity: simplify complex logic, extract helper functions, add explanatory comments
+            - Documentation: update README for significant features, add inline docs for complex logic
+            - Performance optimizations: suggest caching opportunities, query optimizations (non-critical)
+
+            ## Style
+
+            - Follow the repo's linters and formatters
+            - Keep suggestions concise and actionable
+            - Show patch-style diffs for proposed changes
+            - Group related issues together
+
+            ## Behavior
+
+            - Be terse and direct in comments
+            - Prefer inline comments on specific diff lines when possible
+            - Prioritize must-fix issues over nice-to-have suggestions
+            - When reviewing code for issues, if you initially find an issue but then determine no fix is needed, do not comment on it in the findings summary.
+            - Skip review for:
+              - Pure whitespace/formatting changes (if linters pass)
+              - Documentation-only updates (unless security/compliance docs)
+              - Configuration changes without code impact
+              - Minor dependency bumps (unless security-related)
+            - If skipping, comment: "No significant code changes to review" and explain why
+
+            ## Instructions
+            1. Review the PR based on review rubric and focus on must-fix items, security, HIPAA, and compliance issues. Be concise.
+            2. If issues found, post specific inline comments on the problematic lines
+            3. If no issues, comment "LGTM - no security/compliance issues detected"
+            4. Be concise and actionable
+            5. Provide detailed feedback on code review
+
+            ${{ inputs.extra_prompt }}
           claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --allowedTools 'Read,Glob,Grep,Bash(git log:*),Bash(git diff:*),Bash(git show:*)'"
           track_progress: true
