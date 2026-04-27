@@ -1,0 +1,34 @@
+name: PR Linear Ticket Check
+
+on:
+  workflow_call:
+    inputs:
+      linear_org:
+        description: Linear workspace slug (part of the URL)
+        type: string
+        default: twenty
+
+jobs:
+  check-linear-ticket:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Linear ticket URL (skip bots)
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          LINEAR_ORG: ${{ inputs.linear_org }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          if [[ "$ACTOR" == "dependabot[bot]" || "$ACTOR" == "renovate[bot]" || "$ACTOR" == "github-actions[bot]" ]]; then
+            echo "Bot actor ($ACTOR) — skipping Linear ticket check"
+            exit 0
+          fi
+          if echo "$PR_BODY" | grep -qE "https://linear\.app/${LINEAR_ORG}/issue/[A-Z]+-[0-9]+"; then
+            echo "✅ Linear ticket URL found"
+          else
+            echo "❌ PR body must contain a Linear ticket URL"
+            echo ""
+            echo "Expected format: https://linear.app/${LINEAR_ORG}/issue/DO-123/ticket-slug"
+            echo ""
+            echo "Add a '## Linear Ticket' section to your PR body with the ticket URL."
+            exit 1
+          fi
