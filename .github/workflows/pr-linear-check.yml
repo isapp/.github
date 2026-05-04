@@ -16,10 +16,10 @@ jobs:
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           LINEAR_ORG: ${{ inputs.linear_org }}
-          ACTOR: ${{ github.actor }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          if [[ "$ACTOR" == "dependabot[bot]" || "$ACTOR" == "renovate[bot]" || "$ACTOR" == "github-actions[bot]" ]]; then
-            echo "Bot actor ($ACTOR) — skipping Linear ticket check"
+          if [[ "$PR_AUTHOR" == "dependabot[bot]" || "$PR_AUTHOR" == "renovate[bot]" || "$PR_AUTHOR" == "github-actions[bot]" ]]; then
+            echo "Bot PR author ($PR_AUTHOR) — skipping Linear ticket check"
             exit 0
           fi
           if echo "$PR_BODY" | grep -qE "https://linear\.app/${LINEAR_ORG}/issue/[A-Z]+-[0-9]+"; then
