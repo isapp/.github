@@ -6,7 +6,7 @@ on:
         description: "Claude model"
         required: false
         type: string
-        default: "claude-sonnet-4-6"
+        default: "claude-sonnet-5"
       max_turns:
         description: "Maximum conversation turns"
         required: false
