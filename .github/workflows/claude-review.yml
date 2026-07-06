@@ -59,12 +59,19 @@ jobs:
           prompt: |
             /review
 
-            IMPORTANT: Also reference and apply the organization-wide code review guidelines available at:
-            https://github.com/isapp/.github/blob/main/CLAUDE.md
+            ## Environment constraints
 
-            These org-level guidelines cover security (OWASP, SQL injection, auth), compliance (HIPAA, SOC2, FedRAMP),
-            data handling, infrastructure, performance, testing, APIs, and dependencies.
-            Apply these standards IN ADDITION to any repository-specific CLAUDE.md guidelines.
+            This review runs with a restricted toolset: only Read, Glob, Grep, LS, and
+            `git log`/`git diff`/`git show` are available. There is no ability to run
+            builds, linters, or test suites, install dependencies, or reach the network.
+            Do not attempt repo setup, linting, or test commands, and do not retry a
+            denied tool call — go straight to a static review of the diff with the
+            allowed tools. If something genuinely requires a disallowed tool, note that
+            once in the final comment instead of retrying.
+
+            The review rubric below already incorporates the organization-wide code
+            review guidelines. Apply it IN ADDITION to any repository-specific
+            CLAUDE.md guidelines.
 
             # Review rubric (Claude)
 
@@ -91,6 +98,21 @@ jobs:
             - Indexes: add indexes for foreign keys and frequently queried columns
             - Data validation: constraints at database level, not just application level
             - PHI/PII: ensure proper encryption, audit trails for sensitive data access
+
+            ### Mobile (iOS/Android)
+            - UI thread safety: no network/database calls on main thread
+            - Background work: proper WorkManager (Android) or BackgroundTask (iOS) usage
+            - Permissions: clear rationale strings, runtime permission checks
+            - Network: timeouts, retries with exponential backoff, offline handling
+            - Security: certificate pinning, secure storage (Keychain/KeyStore), code obfuscation
+            - Accessibility: VoiceOver/TalkBack support, proper content descriptions
+
+            ### Infrastructure (Terraform/IaC/Docker)
+            - IaC: Terraform state encryption, no hardcoded credentials, least-privilege IAM policies
+            - Container security: non-root users, minimal base images, scan for vulnerabilities
+            - Secrets: use AWS Secrets Manager/SSM Parameter Store, never commit secrets
+            - Network: proper security groups, VPC configuration, no public exposure of sensitive resources
+            - Monitoring: CloudWatch logs and alarms for critical resources
 
             ## Should-fix
 
@@ -151,5 +173,5 @@ jobs:
             5. Provide detailed feedback on code review
 
             ${{ inputs.extra_prompt }}
-          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --allowedTools 'Read,Glob,Grep,Bash(git log:*),Bash(git diff:*),Bash(git show:*)'"
+          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --allowedTools 'Read,Glob,Grep,LS,Bash(git log:*),Bash(git diff:*),Bash(git show:*)'"
           track_progress: true
