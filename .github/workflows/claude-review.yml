@@ -61,13 +61,17 @@ jobs:
 
             ## Environment constraints
 
-            This review runs with a restricted toolset: only Read, Glob, Grep, LS, and
-            `git log`/`git diff`/`git show` are available. There is no ability to run
-            builds, linters, or test suites, install dependencies, or reach the network.
-            Do not attempt repo setup, linting, or test commands, and do not retry a
-            denied tool call — go straight to a static review of the diff with the
-            allowed tools. If something genuinely requires a disallowed tool, note that
-            once in the final comment instead of retrying.
+            This review runs with a restricted toolset: Read, Glob, Grep, LS, and
+            `git log`/`git diff`/`git show`. There is no ability to run builds,
+            linters, or test suites, install dependencies, or reach the network, so
+            do not attempt repo setup, linting, or test commands. To search and read
+            code use the Read, Grep, and Glob tools, not shell `grep`, `find`, `cat`,
+            or `python`: bash is git-only, so any other shell command is denied and
+            wastes a turn. Review primarily from the diff
+            (`git diff origin/<base>...HEAD`), opening additional files only when a
+            finding needs cross-file confirmation. Do not retry a denied tool call —
+            if something genuinely requires a disallowed tool, note it once in the
+            final comment.
 
             The review rubric below already incorporates the organization-wide code
             review guidelines. Apply it IN ADDITION to any repository-specific
