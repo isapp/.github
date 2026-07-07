@@ -61,17 +61,14 @@ jobs:
 
             ## Environment constraints
 
-            This review runs with a restricted toolset: Read, Glob, Grep, LS, and
-            `git log`/`git diff`/`git show`. There is no ability to run builds,
-            linters, or test suites, install dependencies, or reach the network, so
-            do not attempt repo setup, linting, or test commands. To search and read
-            code use the Read, Grep, and Glob tools, not shell `grep`, `find`, `cat`,
-            or `python`: bash is git-only, so any other shell command is denied and
-            wastes a turn. Review primarily from the diff
-            (`git diff origin/<base>...HEAD`), opening additional files only when a
-            finding needs cross-file confirmation. Do not retry a denied tool call —
-            if something genuinely requires a disallowed tool, note it once in the
-            final comment.
+            This review is read-only: the Read, Glob, and Grep tools plus read-only
+            shell (`git log`/`git diff`/`git show`, `grep`, `cat`, `head`, `tail`,
+            `wc`) are available. It cannot run builds, linters, or test suites,
+            install dependencies, edit files, or reach the network — so do not
+            attempt repo setup, linting, or test commands. Review primarily from the
+            diff (`git diff origin/<base>...HEAD`), opening additional files only when
+            a finding needs cross-file confirmation. If something genuinely requires a
+            disallowed tool, note it once in the final comment instead of retrying.
 
             The review rubric below already incorporates the organization-wide code
             review guidelines. Apply it IN ADDITION to any repository-specific
@@ -177,5 +174,5 @@ jobs:
             5. Provide detailed feedback on code review
 
             ${{ inputs.extra_prompt }}
-          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --allowedTools 'Read,Glob,Grep,LS,Bash(git log:*),Bash(git diff:*),Bash(git show:*)'"
+          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --allowedTools 'Read,Glob,Grep,LS,Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*)'"
           track_progress: true
