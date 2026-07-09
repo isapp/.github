@@ -63,9 +63,11 @@ jobs:
 
             This review is read-only: the Read, Glob, and Grep tools plus read-only
             shell (`git log`/`git diff`/`git show`, `grep`, `cat`, `head`, `tail`,
-            `wc`) are available. It cannot run builds, linters, or test suites,
-            install dependencies, edit files, or reach the network — so do not
-            attempt repo setup, linting, or test commands. Review primarily from the
+            `wc`, `ls`, `jq`) are available. Use `jq` to inspect or query JSON (it is
+            read-only) — `python`, `node`, and other interpreters are NOT available.
+            It cannot run builds, linters, or test suites, install dependencies, edit
+            files, or reach the network — so do not attempt repo setup, linting, or
+            test commands. Review primarily from the
             diff (`git diff origin/<base>...HEAD`), opening additional files only when
             a finding needs cross-file confirmation. If something genuinely requires a
             disallowed tool, note it once in the final comment instead of retrying.
@@ -174,5 +176,5 @@ jobs:
             5. Provide detailed feedback on code review
 
             ${{ inputs.extra_prompt }}
-          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --allowedTools 'Read,Glob,Grep,LS,Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*)'"
+          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --allowedTools 'Read,Glob,Grep,LS,Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(jq:*),Bash(ls:*)'"
           track_progress: true
