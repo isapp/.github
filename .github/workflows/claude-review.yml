@@ -65,6 +65,8 @@ jobs:
             shell (`git log`/`git diff`/`git show`, `grep`, `cat`, `head`, `tail`,
             `wc`, `ls`, `jq`) are available. Use `jq` to inspect or query JSON (it is
             read-only) — `python`, `node`, and other interpreters are NOT available.
+            To locate or list files, use the Glob and LS tools (or `ls`) — `find` is
+            NOT available.
             It cannot run builds, linters, or test suites, install dependencies, edit
             files, or reach the network — so do not attempt repo setup, linting, or
             test commands. Review primarily from the
