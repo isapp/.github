@@ -54,7 +54,7 @@ jobs:
           GITHUB_EVENT_NAME: pull_request
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          allowed_bots: "renovate,devin-ai-integration"
+          allowed_bots: "aikido-autofix-us,blacksmith-sh,dependabot,renovate"
           use_sticky_comment: true
           prompt: |
             /review
