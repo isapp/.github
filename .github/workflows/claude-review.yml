@@ -63,7 +63,7 @@ jobs:
 
             This review is read-only: the Read, Glob, and Grep tools plus read-only
             shell (`git log`/`git diff`/`git show`, `grep`, `cat`, `head`, `tail`,
-            `wc`, `ls`, `jq`) are available. Use `jq` to inspect or query JSON (it is
+            `wc`, `ls`, `jq`, `diff`) are available. Use `jq` to inspect or query JSON (it is
             read-only) — `python`, `node`, and other interpreters are NOT available.
             To locate or list files, use the Glob and LS tools (or `ls`) — `find` is
             NOT available.
@@ -77,6 +77,17 @@ jobs:
             The review rubric below already incorporates the organization-wide code
             review guidelines. Apply it IN ADDITION to any repository-specific
             CLAUDE.md guidelines.
+
+            ## Repeated changes across files
+
+            When the same change repeats across files (a migration applied to several
+            modules, a field added to many definitions, a symbol renamed across
+            callers), review it once on one representative file, then confirm the
+            other occurrences are identical rather than re-reading each — e.g. `diff
+            <(git diff origin/<base>...HEAD -- fileA) <(git diff origin/<base>...HEAD
+            -- fileB)`. Focus the review on the distinct changes and on any file that
+            does not match the pattern — a deviation from an otherwise-uniform change
+            is the highest-signal finding.
 
             # Review rubric (Claude)
 
@@ -178,5 +189,5 @@ jobs:
             5. Provide detailed feedback on code review
 
             ${{ inputs.extra_prompt }}
-          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --allowedTools 'Read,Glob,Grep,LS,Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(jq:*),Bash(ls:*)'"
+          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --allowedTools 'Read,Glob,Grep,LS,Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(jq:*),Bash(ls:*),Bash(diff:*)'"
           track_progress: true
