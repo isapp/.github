@@ -1,3 +1,22 @@
+# Reusable AI PR-review workflow. Callers invoke it from a `pull_request`
+# workflow (see each repo's .github/workflows/claude.yml).
+#
+# Permission model: the review gets a full read shell (Read/Glob/Grep/LS plus
+# Bash) so it never wastes turns on denied commands; scope and safety are
+# enforced by separate mechanisms rather than a command allow-list:
+#   - scope (don't run builds/tests): a narrow deny-list of package managers,
+#     build/test runners, and network tools (in claude_args below)
+#   - safety: a read-only contents token; denies on the git add/commit/rm/push
+#     commands claude-code-action injects by default (deny beats allow from
+#     every source); a harden-runner egress step (audit); the ephemeral runner
+#
+# ADOPTION PRECONDITION (cannot be enforced from here — callers must honor it):
+# invoke this only on `pull_request`, never `pull_request_target`, and do not
+# enable "send secrets to fork PRs". That trigger model is the real safety
+# boundary — it keeps secret-bearing runs limited to same-repo (push-access)
+# authors; fork and read-only-collaborator PRs get no secrets, so the review
+# can't authenticate and never runs. The deny-list and egress control are
+# defense-in-depth on top of it.
 name: Claude Code – PR Review
 on:
   workflow_call:
@@ -27,7 +46,10 @@ on:
         required: true
 
 permissions:
-  contents: write
+  # read-only: the review reads the checkout and posts comments, never pushes.
+  # (The git add/commit/rm/push denies in claude_args below close the mutation
+  # path claude-code-action's injected allows would otherwise leave open.)
+  contents: read
   pull-requests: write
   issues: write
   actions: read
@@ -42,6 +64,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
+      # Network egress control, audit mode. MUST be the job's first step so
+      # the monitor is installed before anything else runs. In audit mode
+      # harden-runner logs every outbound connection (an egress audit trail —
+      # how we see what the reviewer's runner actually contacts) and blocks
+      # known-compromised C2/exfil endpoints from its built-in threat feed
+      # regardless of policy. It does NOT block egress to a novel host in
+      # audit mode. Staying in audit is deliberate: the real safety boundary
+      # is the trigger model (see the adoption precondition at the top of this
+      # file), and egress filtering — like the command deny-list, which can't
+      # fence bash /dev/tcp or python sockets — is defense-in-depth. Switching
+      # egress-policy to `block` with an `allowed-endpoints` list would stop
+      # novel-host exfil rather than just log it, at the cost of maintaining
+      # that list against endpoint drift; capture the baseline from a real
+      # run's audit log first.
+      - name: Harden runner egress
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
       - name: Checkout PR
         uses: actions/checkout@v5
         with:
@@ -61,33 +102,26 @@ jobs:
 
             ## Environment constraints
 
-            This review is read-only: the Read, Glob, and Grep tools plus read-only
-            shell (`git log`/`git diff`/`git show`, `grep`, `cat`, `head`, `tail`,
-            `wc`, `ls`, `jq`, `diff`) are available. Use `jq` to inspect or query JSON (it is
-            read-only) — `python`, `node`, and other interpreters are NOT available.
-            To locate or list files, use the Glob and LS tools (or `ls`) — `find` is
-            NOT available.
-            It cannot run builds, linters, or test suites, install dependencies, edit
-            files, or reach the network — so do not attempt repo setup, linting, or
-            test commands. Review primarily from the
-            diff (`git diff origin/<base>...HEAD`), opening additional files only when
-            a finding needs cross-file confirmation. If something genuinely requires a
-            disallowed tool, note it once in the final comment instead of retrying.
+            This review is read-only. You have the Read, Glob, and Grep tools plus a
+            shell for read-only inspection — git (log/diff/show), grep, find, sed, awk,
+            jq, python3 one-liners, pipes, and loops all work. Batch repetitive
+            per-file checks into a single command (e.g. one loop, or one
+            process-substitution diff) instead of one command per file.
+
+            Do NOT edit files, run builds, linters, or test suites, install
+            dependencies, or access the network. Package managers, build tools, and
+            network commands are blocked, and executing the project is out of scope
+            regardless — the job is reading and reasoning about the diff. If something
+            genuinely requires a blocked tool, note it once in the final comment
+            instead of retrying. The checkout already contains full history and
+            `origin/<base>` — do not `git fetch` or `git pull`.
+
+            Review primarily from the diff (`git diff origin/<base>...HEAD`), opening
+            additional files only when a finding needs cross-file confirmation.
 
             The review rubric below already incorporates the organization-wide code
             review guidelines. Apply it IN ADDITION to any repository-specific
             CLAUDE.md guidelines.
-
-            ## Repeated changes across files
-
-            When the same change repeats across files (a migration applied to several
-            modules, a field added to many definitions, a symbol renamed across
-            callers), review it once on one representative file, then confirm the
-            other occurrences are identical rather than re-reading each — e.g. `diff
-            <(git diff origin/<base>...HEAD -- fileA) <(git diff origin/<base>...HEAD
-            -- fileB)`. Focus the review on the distinct changes and on any file that
-            does not match the pattern — a deviation from an otherwise-uniform change
-            is the highest-signal finding.
 
             # Review rubric (Claude)
 
@@ -189,5 +223,22 @@ jobs:
             5. Provide detailed feedback on code review
 
             ${{ inputs.extra_prompt }}
-          claude_args: "--model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --allowedTools 'Read,Glob,Grep,LS,Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(jq:*),Bash(ls:*),Bash(diff:*)'"
+          # --allowedTools: bare `Bash` (plus the read tools) replaces the old
+          # command enumeration — the model drives a full shell, so every
+          # construct not on an allow-list (find, sed, awk, python3, pipes,
+          # loops) used to cost a turn on a denial + retry. Safety does NOT rest
+          # on this list; see the deny-list and the header.
+          # --disallowedTools: scope guards + defense-in-depth (best-effort, not
+          # a boundary — it can't fence bash /dev/tcp or python sockets). git
+          # add/commit/rm/push: claude-code-action injects allows for exactly
+          # these + its git-push.sh helper; deny beats allow, closing the push
+          # path even for the action's own token. git fetch/pull: checkout is
+          # complete already. Plus network tools and package/build/test runners
+          # (executing the project is out of scope). Bash(...) patterns ONLY —
+          # never an MCP tool name, or the sticky-comment tool breaks.
+          claude_args: >-
+            --model ${{ inputs.model }}
+            --max-turns ${{ inputs.max_turns }}
+            --allowedTools 'Read,Glob,Grep,LS,Bash'
+            --disallowedTools 'Bash(git push:*),Bash(git commit:*),Bash(git add:*),Bash(git rm:*),Bash(git fetch:*),Bash(git pull:*),Bash(gh:*),Bash(curl:*),Bash(wget:*),Bash(nc:*),Bash(ncat:*),Bash(ssh:*),Bash(scp:*),Bash(rsync:*),Bash(npm:*),Bash(npx:*),Bash(yarn:*),Bash(pnpm:*),Bash(pip:*),Bash(pip3:*),Bash(poetry:*),Bash(uv:*),Bash(bundle:*),Bash(gem:*),Bash(pod:*),Bash(brew:*),Bash(apt:*),Bash(apt-get:*),Bash(sudo:*),Bash(make:*),Bash(cmake:*),Bash(gradle:*),Bash(./gradlew:*),Bash(xcodebuild:*),Bash(swift:*),Bash(pytest:*),Bash(tox:*),Bash(tsc:*),Bash(cargo:*),Bash(go:*),Bash(docker:*),Bash(terraform:*)'
           track_progress: true
