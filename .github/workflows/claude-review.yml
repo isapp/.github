@@ -116,6 +116,14 @@ jobs:
             instead of retrying. The checkout already contains full history and
             `origin/<base>` — do not `git fetch` or `git pull`.
 
+            Because nothing here can be executed, most of what you report is
+            inferred from reading rather than confirmed by running it. Disclose
+            which is which. When a finding depends on something you could not
+            confirm by reading — a runtime value, whether a test actually fails
+            without the change, how a dependency behaves internally, whether a
+            migration succeeds against real data — say that part is inferred and
+            name what would confirm it. Do not present an inference as verified.
+
             Review primarily from the diff (`git diff origin/<base>...HEAD`), opening
             additional files only when a finding needs cross-file confirmation.
 
@@ -240,5 +248,5 @@ jobs:
             --model ${{ inputs.model }}
             --max-turns ${{ inputs.max_turns }}
             --allowedTools 'Read,Glob,Grep,LS,Bash'
-            --disallowedTools 'Bash(git push:*),Bash(git commit:*),Bash(git add:*),Bash(git rm:*),Bash(git fetch:*),Bash(git pull:*),Bash(gh:*),Bash(curl:*),Bash(wget:*),Bash(nc:*),Bash(ncat:*),Bash(ssh:*),Bash(scp:*),Bash(rsync:*),Bash(npm:*),Bash(npx:*),Bash(yarn:*),Bash(pnpm:*),Bash(pip:*),Bash(pip3:*),Bash(poetry:*),Bash(uv:*),Bash(bundle:*),Bash(gem:*),Bash(pod:*),Bash(brew:*),Bash(apt:*),Bash(apt-get:*),Bash(sudo:*),Bash(make:*),Bash(cmake:*),Bash(gradle:*),Bash(./gradlew:*),Bash(xcodebuild:*),Bash(swift:*),Bash(pytest:*),Bash(tox:*),Bash(tsc:*),Bash(cargo:*),Bash(go:*),Bash(docker:*),Bash(terraform:*)'
+            --disallowedTools 'Bash(git push:*),Bash(git commit:*),Bash(git add:*),Bash(git rm:*),Bash(git fetch:*),Bash(git pull:*),Bash(gh:*),Bash(curl:*),Bash(wget:*),Bash(nc:*),Bash(ncat:*),Bash(ssh:*),Bash(scp:*),Bash(rsync:*),Bash(npm:*),Bash(npx:*),Bash(yarn:*),Bash(pnpm:*),Bash(turbo:*),Bash(pip:*),Bash(pip3:*),Bash(poetry:*),Bash(uv:*),Bash(bundle:*),Bash(gem:*),Bash(pod:*),Bash(brew:*),Bash(apt:*),Bash(apt-get:*),Bash(sudo:*),Bash(make:*),Bash(cmake:*),Bash(gradle:*),Bash(./gradlew:*),Bash(xcodebuild:*),Bash(swift:*),Bash(pytest:*),Bash(tox:*),Bash(tsc:*),Bash(cargo:*),Bash(go:*),Bash(docker:*),Bash(terraform:*)'
           track_progress: true
