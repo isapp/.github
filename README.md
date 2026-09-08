@@ -37,7 +37,7 @@ jobs:
       - name: Run Claude Code Review
         # Temporarily pinned below @v1 (latest): 1.0.218 broke this workflow.
         # Revert to @v1 once a fixed release is out.
-        uses: anthropics/claude-code-action@1.0.217
+        uses: anthropics/claude-code-action@v1.0.217
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
