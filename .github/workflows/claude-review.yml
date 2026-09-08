@@ -92,7 +92,7 @@ jobs:
       - name: Run Claude Code Review
         # Pinned below @v1 (latest) because 1.0.218 broke this workflow.
         # Revert to @v1 once a fixed release is out.
-        uses: anthropics/claude-code-action@1.0.217
+        uses: anthropics/claude-code-action@v1.0.217
         env:
           GITHUB_EVENT_NAME: pull_request
         with:
